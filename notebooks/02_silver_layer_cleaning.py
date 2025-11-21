@@ -185,7 +185,7 @@ print(f"✅ Categories cleaned: {df_categories_silver.count()} rows")
 
 print("Cleaning customers...")
 
-# Read from bronze
+# Read from bronze - read date columns as strings to avoid parsing errors
 df_customers_bronze = spark.table(f"{CATALOG_NAME}.{BRONZE_SCHEMA}.customers")
 
 print(f"📊 Bronze records: {df_customers_bronze.count()}")
@@ -215,26 +215,34 @@ df_customers_silver = df_customers_silver.withColumn(
 )
 
 # Standardize dates (try multiple formats)
-# First, ensure date columns are read as strings to avoid parsing errors
-df_customers_silver = df_customers_silver.withColumn(
-    "birth_date_str",
-    F.cast(F.col("birth_date"), "string")
-).withColumn(
-    "registration_date_str",
-    F.cast(F.col("registration_date"), "string")
-)
+# Convert date columns to string first, then parse
+birth_date_str = F.cast(F.col("birth_date"), "string")
+registration_date_str = F.cast(F.col("registration_date"), "string")
 
-# Now parse dates trying multiple formats
+# Parse dates trying multiple formats using try_to_date
 df_customers_silver = df_customers_silver.withColumn(
     "birth_date",
-    parse_date_column("birth_date_str")
+    F.coalesce(
+        F.try_to_date(birth_date_str, "yyyy-MM-dd"),
+        F.try_to_date(birth_date_str, "yyyy/MM/dd"),
+        F.try_to_date(birth_date_str, "dd/MM/yyyy"),
+        F.try_to_date(birth_date_str, "MM-dd-yyyy"),
+        F.try_to_date(birth_date_str, "dd-MM-yyyy"),
+        F.try_to_date(birth_date_str, "MMM dd, yyyy"),
+        F.try_to_date(birth_date_str, "MMMM dd, yyyy")
+    )
 ).withColumn(
     "registration_date",
-    parse_date_column("registration_date_str")
+    F.coalesce(
+        F.try_to_date(registration_date_str, "yyyy-MM-dd"),
+        F.try_to_date(registration_date_str, "yyyy/MM/dd"),
+        F.try_to_date(registration_date_str, "dd/MM/yyyy"),
+        F.try_to_date(registration_date_str, "MM-dd-yyyy"),
+        F.try_to_date(registration_date_str, "dd-MM-yyyy"),
+        F.try_to_date(registration_date_str, "MMM dd, yyyy"),
+        F.try_to_date(registration_date_str, "MMMM dd, yyyy")
+    )
 )
-
-# Drop temporary string columns
-df_customers_silver = df_customers_silver.drop("birth_date_str", "registration_date_str")
 
 # Convert zip_code to integer (handle type errors)
 df_customers_silver = df_customers_silver.withColumn(
@@ -302,9 +310,18 @@ df_products_silver = df_products_silver.withColumn(
 )
 
 # Standardize created_date (try multiple formats)
+created_date_str = F.cast(F.col("created_date"), "string")
 df_products_silver = df_products_silver.withColumn(
     "created_date",
-    parse_date_column("created_date")
+    F.coalesce(
+        F.try_to_date(created_date_str, "yyyy-MM-dd"),
+        F.try_to_date(created_date_str, "yyyy/MM/dd"),
+        F.try_to_date(created_date_str, "dd/MM/yyyy"),
+        F.try_to_date(created_date_str, "MM-dd-yyyy"),
+        F.try_to_date(created_date_str, "dd-MM-yyyy"),
+        F.try_to_date(created_date_str, "MMM dd, yyyy"),
+        F.try_to_date(created_date_str, "MMMM dd, yyyy")
+    )
 )
 
 # Validate category_id exists in categories table
@@ -357,9 +374,18 @@ df_orders_silver = df_orders_silver.withColumn(
 )
 
 # Standardize order_date (try multiple formats)
+order_date_str = F.cast(F.col("order_date"), "string")
 df_orders_silver = df_orders_silver.withColumn(
     "order_date",
-    parse_date_column("order_date")
+    F.coalesce(
+        F.try_to_date(order_date_str, "yyyy-MM-dd"),
+        F.try_to_date(order_date_str, "yyyy/MM/dd"),
+        F.try_to_date(order_date_str, "dd/MM/yyyy"),
+        F.try_to_date(order_date_str, "MM-dd-yyyy"),
+        F.try_to_date(order_date_str, "dd-MM-yyyy"),
+        F.try_to_date(order_date_str, "MMM dd, yyyy"),
+        F.try_to_date(order_date_str, "MMMM dd, yyyy")
+    )
 )
 
 # Convert total_amount to double (handle type errors)

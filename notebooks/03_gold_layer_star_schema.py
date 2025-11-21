@@ -28,6 +28,7 @@
 from pyspark.sql import functions as F
 from pyspark.sql.types import *
 from datetime import datetime, timedelta
+from pyspark.sql.window import Window
 
 # Unity Catalog configuration
 CATALOG_NAME = "ecommerce_data"

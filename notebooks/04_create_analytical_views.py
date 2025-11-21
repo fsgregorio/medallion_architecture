@@ -47,13 +47,16 @@ def create_view(view_name, sql_query, description=""):
     
     Parameters:
     - view_name: Name of the view
-    - sql_query: SQL query for the view
+    - sql_query: SQL query for the view (can use {CATALOG_NAME} and {GOLD_SCHEMA} placeholders)
     - description: Optional description
     """
     full_view_name = f"{CATALOG_NAME}.{GOLD_SCHEMA}.{view_name}"
     
+    # Format SQL query with catalog and schema names
+    formatted_query = sql_query.format(CATALOG_NAME=CATALOG_NAME, GOLD_SCHEMA=GOLD_SCHEMA)
+    
     # Create or replace view
-    spark.sql(f"CREATE OR REPLACE VIEW {full_view_name} AS {sql_query}")
+    spark.sql(f"CREATE OR REPLACE VIEW {full_view_name} AS {formatted_query}")
     
     print(f"✅ View created: {full_view_name}")
     if description:
@@ -79,7 +82,7 @@ create_view(
         AVG(f.subtotal) as avg_order_item_value,
         SUM(f.calculated_subtotal) as calculated_total_revenue
     FROM {CATALOG_NAME}.{GOLD_SCHEMA}.fato_vendas f
-    """.format(CATALOG_NAME=CATALOG_NAME),
+    """,
     "Overall sales summary with key metrics"
 )
 
@@ -107,7 +110,7 @@ create_view(
         ON f.category_key = c.category_key
     GROUP BY c.category_name
     ORDER BY total_revenue DESC
-    """.format(CATALOG_NAME=CATALOG_NAME),
+    """,
     "Sales performance by product category"
 )
 
@@ -137,7 +140,7 @@ create_view(
         ON f.date_key = t.date_key
     GROUP BY t.year, t.month, t.month_name, t.year_month
     ORDER BY t.year DESC, t.month DESC
-    """.format(CATALOG_NAME=CATALOG_NAME),
+    """,
     "Monthly sales trends and metrics"
 )
 
@@ -166,7 +169,7 @@ create_view(
         ON f.date_key = t.date_key
     GROUP BY t.year, t.quarter, t.year_quarter
     ORDER BY t.year DESC, t.quarter DESC
-    """.format(CATALOG_NAME=CATALOG_NAME),
+    """,
     "Quarterly sales performance"
 )
 
@@ -202,7 +205,7 @@ create_view(
         ON f.date_key = t.date_key
     GROUP BY c.customer_id, c.full_name, c.email, c.city, c.state, c.age
     ORDER BY total_spent DESC
-    """.format(CATALOG_NAME=CATALOG_NAME),
+    """,
     "Top customers by total spending (using current customer records)"
 )
 
@@ -236,7 +239,7 @@ create_view(
         ON f.category_key = c.category_key
     GROUP BY p.product_id, p.product_name, c.category_name, p.price, p.stock_status
     ORDER BY total_revenue DESC
-    """.format(CATALOG_NAME=CATALOG_NAME),
+    """,
     "Top products by revenue (using current product records)"
 )
 
@@ -276,7 +279,7 @@ create_view(
         c.customer_id, c.full_name, c.email, c.city, c.state,
         f.order_id, o.status, o.payment_type, t.full_date, t.year_month
     ORDER BY c.customer_id, t.full_date DESC
-    """.format(CATALOG_NAME=CATALOG_NAME),
+    """,
     "Detailed order history per customer"
 )
 
@@ -310,7 +313,7 @@ create_view(
     GROUP BY 
         p.product_id, p.product_name, c.category_name, t.year_month
     ORDER BY p.product_id, t.year_month DESC
-    """.format(CATALOG_NAME=CATALOG_NAME),
+    """,
     "Monthly sales trends per product"
 )
 
@@ -347,7 +350,7 @@ create_view(
         t.full_date, t.year, t.month, t.day_of_month, 
         t.day_name, t.is_weekend
     ORDER BY t.full_date DESC
-    """.format(CATALOG_NAME=CATALOG_NAME),
+    """,
     "Daily sales metrics"
 )
 
@@ -381,7 +384,7 @@ create_view(
         AND p.is_current = 1
     GROUP BY c.category_id, c.category_name
     ORDER BY total_revenue DESC
-    """.format(CATALOG_NAME=CATALOG_NAME),
+    """,
     "Comprehensive category performance metrics"
 )
 
@@ -407,7 +410,7 @@ create_view(
         ON f.order_key = o.order_key
     GROUP BY o.status
     ORDER BY total_orders DESC
-    """.format(CATALOG_NAME=CATALOG_NAME),
+    """,
     "Sales summary by order status"
 )
 
@@ -436,7 +439,7 @@ create_view(
         ON f.order_key = o.order_key
     GROUP BY o.payment_type
     ORDER BY total_revenue DESC
-    """.format(CATALOG_NAME=CATALOG_NAME),
+    """,
     "Payment method analysis and preferences"
 )
 
@@ -478,7 +481,7 @@ create_view(
     GROUP BY 
         c.customer_id, c.full_name, c.city, c.state, c.age
     ORDER BY total_spent DESC
-    """.format(CATALOG_NAME=CATALOG_NAME),
+    """,
     "Customer segmentation by age and spending"
 )
 
@@ -507,7 +510,7 @@ create_view(
         ON f.date_key = t.date_key
     GROUP BY t.year, t.week
     ORDER BY t.year DESC, t.week DESC
-    """.format(CATALOG_NAME=CATALOG_NAME),
+    """,
     "Weekly sales aggregation"
 )
 
@@ -537,7 +540,7 @@ create_view(
         AND p.is_current = 1
     GROUP BY c.category_name, p.product_name, p.price
     ORDER BY c.category_name, total_revenue DESC
-    """.format(CATALOG_NAME=CATALOG_NAME),
+    """,
     "Product performance within each category"
 )
 

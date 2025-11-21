@@ -110,8 +110,10 @@ window_spec = Window.partitionBy("customer_id").orderBy("registration_date")
 df_dim_customer = df_customers.withColumn(
     "row_num", F.row_number().over(window_spec)
 ).select(
-    # Surrogate key: hash of natural key + row number for uniqueness
-    (F.hash(F.col("customer_id").cast("string")) * 1000 + F.col("row_num")).alias("customer_key"),
+    # Surrogate key: Use abs(hash) to avoid negative, then add row_num
+    # Using modulo to keep within safe integer range (max int32 is 2147483647)
+    # We use a smaller modulo to leave room for row_num addition
+    (F.abs(F.hash(F.col("customer_id").cast("string"))) % 2147480000 + F.col("row_num")).alias("customer_key"),
     F.col("customer_id").alias("customer_id"),   # Natural key
     F.col("first_name"),
     F.col("last_name"),
@@ -165,8 +167,10 @@ df_dim_product = df_products.join(
 ).withColumn(
     "row_num", F.row_number().over(window_spec_product)
 ).select(
-    # Surrogate key: hash of natural key + row number for uniqueness
-    (F.hash(F.col("product_id").cast("string")) * 1000 + F.col("row_num")).alias("product_key"),
+    # Surrogate key: Use abs(hash) to avoid negative, then add row_num
+    # Using modulo to keep within safe integer range (max int32 is 2147483647)
+    # We use a smaller modulo to leave room for row_num addition
+    (F.abs(F.hash(F.col("product_id").cast("string"))) % 2147480000 + F.col("row_num")).alias("product_key"),
     F.col("product_id").alias("product_id"),   # Natural key
     F.col("product_name"),
     F.col("category_id"),

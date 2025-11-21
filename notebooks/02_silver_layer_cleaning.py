@@ -25,6 +25,7 @@ from datetime import datetime
 from pyspark.sql import functions as F
 from pyspark.sql.types import *
 from pyspark.sql.window import Window
+from pyspark.sql.udf import UserDefinedFunction
 
 # Unity Catalog configuration
 CATALOG_NAME = "ecommerce_data"
@@ -109,25 +110,45 @@ def convert_to_numeric(value, default=None):
     except:
         return default
 
-def parse_date_column(column_name):
-    """Parse date column trying multiple formats using coalesce"""
-    # List of common date formats to try
+def parse_date_udf(date_str):
+    """UDF to parse dates trying multiple formats"""
+    if date_str is None or pd.isna(date_str) or date_str == '':
+        return None
+    
+    # Convert to string if not already
+    date_str = str(date_str).strip()
+    
+    # List of date formats to try
     date_formats = [
-        "yyyy-MM-dd",      # ISO format: 2024-01-15
-        "yyyy/MM/dd",      # Slash format: 2024/01/15
-        "dd/MM/yyyy",      # DD/MM/YYYY: 15/01/2024
-        "MM-dd-yyyy",      # MM-DD-YYYY: 01-15-2024
-        "dd-MM-yyyy",      # DD-MM-YYYY: 15-01-2024
-        "MMM dd, yyyy",    # Jan 15, 2024
-        "MMMM dd, yyyy",   # January 15, 2024
+        "%Y-%m-%d",      # ISO format: 2024-01-15
+        "%Y/%m/%d",      # Slash format: 2024/01/15
+        "%d/%m/%Y",      # DD/MM/YYYY: 15/01/2024
+        "%m-%d-%Y",      # MM-DD-YYYY: 01-15-2024
+        "%d-%m-%Y",      # DD-MM-YYYY: 15-01-2024
+        "%b %d, %Y",     # Jan 15, 2024
+        "%B %d, %Y",     # January 15, 2024
     ]
     
-    # Build coalesce expression trying each format
-    # Use try_to_date to avoid errors, returns NULL if format doesn't match
-    date_exprs = [F.try_to_date(F.col(column_name), fmt) for fmt in date_formats]
+    # Try each format
+    for fmt in date_formats:
+        try:
+            date_obj = datetime.strptime(date_str, fmt)
+            return date_obj.strftime("%Y-%m-%d")
+        except:
+            continue
     
-    # Coalesce returns first non-null value
-    return F.coalesce(*date_exprs)
+    # If no format matches, return None
+    return None
+
+# Register UDF
+parse_date_udf_func = F.udf(parse_date_udf, StringType())
+
+def parse_date_column(column_name):
+    """Parse date column using UDF that tries multiple formats"""
+    # Cast to string first, then apply UDF, then convert to date
+    col_str = F.cast(F.col(column_name), "string")
+    date_str = parse_date_udf_func(col_str)
+    return F.to_date(date_str, "yyyy-MM-dd")
 
 def save_silver_table(df, table_name, mode="overwrite"):
     """Save cleaned DataFrame to Silver layer"""

@@ -110,45 +110,23 @@ def convert_to_numeric(value, default=None):
     except:
         return default
 
-def parse_date_udf(date_str):
-    """UDF to parse dates trying multiple formats"""
-    if date_str is None or pd.isna(date_str) or date_str == '':
-        return None
-    
-    # Convert to string if not already
-    date_str = str(date_str).strip()
-    
-    # List of date formats to try
-    date_formats = [
-        "%Y-%m-%d",      # ISO format: 2024-01-15
-        "%Y/%m/%d",      # Slash format: 2024/01/15
-        "%d/%m/%Y",      # DD/MM/YYYY: 15/01/2024
-        "%m-%d-%Y",      # MM-DD-YYYY: 01-15-2024
-        "%d-%m-%Y",      # DD-MM-YYYY: 15-01-2024
-        "%b %d, %Y",     # Jan 15, 2024
-        "%B %d, %Y",     # January 15, 2024
-    ]
-    
-    # Try each format
-    for fmt in date_formats:
-        try:
-            date_obj = datetime.strptime(date_str, fmt)
-            return date_obj.strftime("%Y-%m-%d")
-        except:
-            continue
-    
-    # If no format matches, return None
-    return None
-
-# Register UDF
-parse_date_udf_func = F.udf(parse_date_udf, StringType())
-
 def parse_date_column(column_name):
-    """Parse date column using UDF that tries multiple formats"""
-    # Cast to string first, then apply UDF, then convert to date
-    col_str = F.cast(F.col(column_name), "string")
-    date_str = parse_date_udf_func(col_str)
-    return F.to_date(date_str, "yyyy-MM-dd")
+    """Parse date column trying multiple formats using try_to_date"""
+    # Get the column (should already be string)
+    col = F.col(column_name)
+    
+    # Try multiple date formats using try_to_date (returns NULL if format doesn't match)
+    # Order matters - try most common formats first
+    # Use coalesce to return first non-null result
+    return F.coalesce(
+        F.try_to_date(col, "yyyy-MM-dd"),      # ISO format: 2024-01-15
+        F.try_to_date(col, "yyyy/MM/dd"),      # Slash format: 2024/01/15 (e.g., 1948/07/14)
+        F.try_to_date(col, "dd/MM/yyyy"),      # DD/MM/YYYY: 15/01/2024
+        F.try_to_date(col, "MM-dd-yyyy"),      # MM-DD-YYYY: 01-15-2024
+        F.try_to_date(col, "dd-MM-yyyy"),      # DD-MM-YYYY: 15-01-2024
+        F.try_to_date(col, "MMM dd, yyyy"),    # Jan 15, 2024
+        F.try_to_date(col, "MMMM dd, yyyy")    # January 15, 2024
+    )
 
 def save_silver_table(df, table_name, mode="overwrite"):
     """Save cleaned DataFrame to Silver layer"""
@@ -237,13 +215,26 @@ df_customers_silver = df_customers_silver.withColumn(
 )
 
 # Standardize dates (try multiple formats)
+# First, ensure date columns are read as strings to avoid parsing errors
+df_customers_silver = df_customers_silver.withColumn(
+    "birth_date_str",
+    F.cast(F.col("birth_date"), "string")
+).withColumn(
+    "registration_date_str",
+    F.cast(F.col("registration_date"), "string")
+)
+
+# Now parse dates trying multiple formats
 df_customers_silver = df_customers_silver.withColumn(
     "birth_date",
-    parse_date_column("birth_date")
+    parse_date_column("birth_date_str")
 ).withColumn(
     "registration_date",
-    parse_date_column("registration_date")
+    parse_date_column("registration_date_str")
 )
+
+# Drop temporary string columns
+df_customers_silver = df_customers_silver.drop("birth_date_str", "registration_date_str")
 
 # Convert zip_code to integer (handle type errors)
 df_customers_silver = df_customers_silver.withColumn(

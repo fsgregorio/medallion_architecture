@@ -110,23 +110,22 @@ def convert_to_numeric(value, default=None):
     except:
         return default
 
-def parse_date_column(column_name):
-    """Parse date column trying multiple formats using try_to_date"""
-    # Get the column (should already be string)
-    col = F.col(column_name)
-    
-    # Try multiple date formats using try_to_date (returns NULL if format doesn't match)
-    # Order matters - try most common formats first
-    # Use coalesce to return first non-null result
-    return F.coalesce(
-        F.try_to_date(col, "yyyy-MM-dd"),      # ISO format: 2024-01-15
-        F.try_to_date(col, "yyyy/MM/dd"),      # Slash format: 2024/01/15 (e.g., 1948/07/14)
-        F.try_to_date(col, "dd/MM/yyyy"),      # DD/MM/YYYY: 15/01/2024
-        F.try_to_date(col, "MM-dd-yyyy"),      # MM-DD-YYYY: 01-15-2024
-        F.try_to_date(col, "dd-MM-yyyy"),      # DD-MM-YYYY: 15-01-2024
-        F.try_to_date(col, "MMM dd, yyyy"),    # Jan 15, 2024
-        F.try_to_date(col, "MMMM dd, yyyy")    # January 15, 2024
-    )
+
+def parse_date_column_sql(column_name):
+    """Parse date column using SQL try_to_date (works in all Spark versions)"""
+    # Use SQL expression - try_to_date is available in Spark SQL
+    col_name = column_name
+    return F.expr(f"""
+        COALESCE(
+            try_to_date(CAST({col_name} AS STRING), 'yyyy-MM-dd'),
+            try_to_date(CAST({col_name} AS STRING), 'yyyy/MM/dd'),
+            try_to_date(CAST({col_name} AS STRING), 'dd/MM/yyyy'),
+            try_to_date(CAST({col_name} AS STRING), 'MM-dd-yyyy'),
+            try_to_date(CAST({col_name} AS STRING), 'dd-MM-yyyy'),
+            try_to_date(CAST({col_name} AS STRING), 'MMM dd, yyyy'),
+            try_to_date(CAST({col_name} AS STRING), 'MMMM dd, yyyy')
+        )
+    """)
 
 def save_silver_table(df, table_name, mode="overwrite"):
     """Save cleaned DataFrame to Silver layer"""
@@ -214,30 +213,14 @@ df_customers_silver = df_customers_silver.withColumn(
     F.trim(F.col("phone"))
 )
 
-# Standardize dates (try multiple formats)
-# Convert date columns to string first, then parse with multiple format attempts
+# Standardize dates (try multiple formats using SQL)
+# Use SQL try_to_date which is available in Spark SQL
 df_customers_silver = df_customers_silver.withColumn(
     "birth_date",
-    F.coalesce(
-        F.try_to_date(F.cast(F.col("birth_date"), "string"), "yyyy-MM-dd"),
-        F.try_to_date(F.cast(F.col("birth_date"), "string"), "yyyy/MM/dd"),
-        F.try_to_date(F.cast(F.col("birth_date"), "string"), "dd/MM/yyyy"),
-        F.try_to_date(F.cast(F.col("birth_date"), "string"), "MM-dd-yyyy"),
-        F.try_to_date(F.cast(F.col("birth_date"), "string"), "dd-MM-yyyy"),
-        F.try_to_date(F.cast(F.col("birth_date"), "string"), "MMM dd, yyyy"),
-        F.try_to_date(F.cast(F.col("birth_date"), "string"), "MMMM dd, yyyy")
-    )
+    parse_date_column_sql("birth_date")
 ).withColumn(
     "registration_date",
-    F.coalesce(
-        F.try_to_date(F.cast(F.col("registration_date"), "string"), "yyyy-MM-dd"),
-        F.try_to_date(F.cast(F.col("registration_date"), "string"), "yyyy/MM/dd"),
-        F.try_to_date(F.cast(F.col("registration_date"), "string"), "dd/MM/yyyy"),
-        F.try_to_date(F.cast(F.col("registration_date"), "string"), "MM-dd-yyyy"),
-        F.try_to_date(F.cast(F.col("registration_date"), "string"), "dd-MM-yyyy"),
-        F.try_to_date(F.cast(F.col("registration_date"), "string"), "MMM dd, yyyy"),
-        F.try_to_date(F.cast(F.col("registration_date"), "string"), "MMMM dd, yyyy")
-    )
+    parse_date_column_sql("registration_date")
 )
 
 # Convert zip_code to integer (handle type errors)
@@ -305,18 +288,10 @@ df_products_silver = df_products_silver.withColumn(
     ).otherwise(F.lit(0))  # Default to 0 if invalid
 )
 
-# Standardize created_date (try multiple formats)
+# Standardize created_date (try multiple formats using SQL)
 df_products_silver = df_products_silver.withColumn(
     "created_date",
-    F.coalesce(
-        F.try_to_date(F.cast(F.col("created_date"), "string"), "yyyy-MM-dd"),
-        F.try_to_date(F.cast(F.col("created_date"), "string"), "yyyy/MM/dd"),
-        F.try_to_date(F.cast(F.col("created_date"), "string"), "dd/MM/yyyy"),
-        F.try_to_date(F.cast(F.col("created_date"), "string"), "MM-dd-yyyy"),
-        F.try_to_date(F.cast(F.col("created_date"), "string"), "dd-MM-yyyy"),
-        F.try_to_date(F.cast(F.col("created_date"), "string"), "MMM dd, yyyy"),
-        F.try_to_date(F.cast(F.col("created_date"), "string"), "MMMM dd, yyyy")
-    )
+    parse_date_column_sql("created_date")
 )
 
 # Validate category_id exists in categories table
@@ -368,18 +343,10 @@ df_orders_silver = df_orders_silver.withColumn(
     F.trim(F.initcap(F.col("payment_type")))
 )
 
-# Standardize order_date (try multiple formats)
+# Standardize order_date (try multiple formats using SQL)
 df_orders_silver = df_orders_silver.withColumn(
     "order_date",
-    F.coalesce(
-        F.try_to_date(F.cast(F.col("order_date"), "string"), "yyyy-MM-dd"),
-        F.try_to_date(F.cast(F.col("order_date"), "string"), "yyyy/MM/dd"),
-        F.try_to_date(F.cast(F.col("order_date"), "string"), "dd/MM/yyyy"),
-        F.try_to_date(F.cast(F.col("order_date"), "string"), "MM-dd-yyyy"),
-        F.try_to_date(F.cast(F.col("order_date"), "string"), "dd-MM-yyyy"),
-        F.try_to_date(F.cast(F.col("order_date"), "string"), "MMM dd, yyyy"),
-        F.try_to_date(F.cast(F.col("order_date"), "string"), "MMMM dd, yyyy")
-    )
+    parse_date_column_sql("order_date")
 )
 
 # Convert total_amount to double (handle type errors)

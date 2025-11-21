@@ -219,7 +219,6 @@ df_customers_silver = df_customers_silver.withColumn(
 birth_date_str = F.cast(F.col("birth_date"), "string")
 registration_date_str = F.cast(F.col("registration_date"), "string")
 
-# Parse dates trying multiple formats using try_to_date
 df_customers_silver = df_customers_silver.withColumn(
     "birth_date",
     F.coalesce(

@@ -215,31 +215,28 @@ df_customers_silver = df_customers_silver.withColumn(
 )
 
 # Standardize dates (try multiple formats)
-# Convert date columns to string first, then parse
-birth_date_str = F.cast(F.col("birth_date"), "string")
-registration_date_str = F.cast(F.col("registration_date"), "string")
-
+# Convert date columns to string first, then parse with multiple format attempts
 df_customers_silver = df_customers_silver.withColumn(
     "birth_date",
     F.coalesce(
-        F.try_to_date(birth_date_str, "yyyy-MM-dd"),
-        F.try_to_date(birth_date_str, "yyyy/MM/dd"),
-        F.try_to_date(birth_date_str, "dd/MM/yyyy"),
-        F.try_to_date(birth_date_str, "MM-dd-yyyy"),
-        F.try_to_date(birth_date_str, "dd-MM-yyyy"),
-        F.try_to_date(birth_date_str, "MMM dd, yyyy"),
-        F.try_to_date(birth_date_str, "MMMM dd, yyyy")
+        F.try_to_date(F.cast(F.col("birth_date"), "string"), "yyyy-MM-dd"),
+        F.try_to_date(F.cast(F.col("birth_date"), "string"), "yyyy/MM/dd"),
+        F.try_to_date(F.cast(F.col("birth_date"), "string"), "dd/MM/yyyy"),
+        F.try_to_date(F.cast(F.col("birth_date"), "string"), "MM-dd-yyyy"),
+        F.try_to_date(F.cast(F.col("birth_date"), "string"), "dd-MM-yyyy"),
+        F.try_to_date(F.cast(F.col("birth_date"), "string"), "MMM dd, yyyy"),
+        F.try_to_date(F.cast(F.col("birth_date"), "string"), "MMMM dd, yyyy")
     )
 ).withColumn(
     "registration_date",
     F.coalesce(
-        F.try_to_date(registration_date_str, "yyyy-MM-dd"),
-        F.try_to_date(registration_date_str, "yyyy/MM/dd"),
-        F.try_to_date(registration_date_str, "dd/MM/yyyy"),
-        F.try_to_date(registration_date_str, "MM-dd-yyyy"),
-        F.try_to_date(registration_date_str, "dd-MM-yyyy"),
-        F.try_to_date(registration_date_str, "MMM dd, yyyy"),
-        F.try_to_date(registration_date_str, "MMMM dd, yyyy")
+        F.try_to_date(F.cast(F.col("registration_date"), "string"), "yyyy-MM-dd"),
+        F.try_to_date(F.cast(F.col("registration_date"), "string"), "yyyy/MM/dd"),
+        F.try_to_date(F.cast(F.col("registration_date"), "string"), "dd/MM/yyyy"),
+        F.try_to_date(F.cast(F.col("registration_date"), "string"), "MM-dd-yyyy"),
+        F.try_to_date(F.cast(F.col("registration_date"), "string"), "dd-MM-yyyy"),
+        F.try_to_date(F.cast(F.col("registration_date"), "string"), "MMM dd, yyyy"),
+        F.try_to_date(F.cast(F.col("registration_date"), "string"), "MMMM dd, yyyy")
     )
 )
 
@@ -309,17 +306,16 @@ df_products_silver = df_products_silver.withColumn(
 )
 
 # Standardize created_date (try multiple formats)
-created_date_str = F.cast(F.col("created_date"), "string")
 df_products_silver = df_products_silver.withColumn(
     "created_date",
     F.coalesce(
-        F.try_to_date(created_date_str, "yyyy-MM-dd"),
-        F.try_to_date(created_date_str, "yyyy/MM/dd"),
-        F.try_to_date(created_date_str, "dd/MM/yyyy"),
-        F.try_to_date(created_date_str, "MM-dd-yyyy"),
-        F.try_to_date(created_date_str, "dd-MM-yyyy"),
-        F.try_to_date(created_date_str, "MMM dd, yyyy"),
-        F.try_to_date(created_date_str, "MMMM dd, yyyy")
+        F.try_to_date(F.cast(F.col("created_date"), "string"), "yyyy-MM-dd"),
+        F.try_to_date(F.cast(F.col("created_date"), "string"), "yyyy/MM/dd"),
+        F.try_to_date(F.cast(F.col("created_date"), "string"), "dd/MM/yyyy"),
+        F.try_to_date(F.cast(F.col("created_date"), "string"), "MM-dd-yyyy"),
+        F.try_to_date(F.cast(F.col("created_date"), "string"), "dd-MM-yyyy"),
+        F.try_to_date(F.cast(F.col("created_date"), "string"), "MMM dd, yyyy"),
+        F.try_to_date(F.cast(F.col("created_date"), "string"), "MMMM dd, yyyy")
     )
 )
 
@@ -373,17 +369,16 @@ df_orders_silver = df_orders_silver.withColumn(
 )
 
 # Standardize order_date (try multiple formats)
-order_date_str = F.cast(F.col("order_date"), "string")
 df_orders_silver = df_orders_silver.withColumn(
     "order_date",
     F.coalesce(
-        F.try_to_date(order_date_str, "yyyy-MM-dd"),
-        F.try_to_date(order_date_str, "yyyy/MM/dd"),
-        F.try_to_date(order_date_str, "dd/MM/yyyy"),
-        F.try_to_date(order_date_str, "MM-dd-yyyy"),
-        F.try_to_date(order_date_str, "dd-MM-yyyy"),
-        F.try_to_date(order_date_str, "MMM dd, yyyy"),
-        F.try_to_date(order_date_str, "MMMM dd, yyyy")
+        F.try_to_date(F.cast(F.col("order_date"), "string"), "yyyy-MM-dd"),
+        F.try_to_date(F.cast(F.col("order_date"), "string"), "yyyy/MM/dd"),
+        F.try_to_date(F.cast(F.col("order_date"), "string"), "dd/MM/yyyy"),
+        F.try_to_date(F.cast(F.col("order_date"), "string"), "MM-dd-yyyy"),
+        F.try_to_date(F.cast(F.col("order_date"), "string"), "dd-MM-yyyy"),
+        F.try_to_date(F.cast(F.col("order_date"), "string"), "MMM dd, yyyy"),
+        F.try_to_date(F.cast(F.col("order_date"), "string"), "MMMM dd, yyyy")
     )
 )
 

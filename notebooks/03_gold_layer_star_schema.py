@@ -75,8 +75,10 @@ print("Creating dim_category...")
 df_categories = spark.table(f"{CATALOG_NAME}.{SILVER_SCHEMA}.categories")
 
 # Create dimension table with surrogate key (SCD Type 1)
+# Generate surrogate key using hash (deterministic)
 df_dim_category = df_categories.select(
-    F.col("category_id").alias("category_key"),  # Surrogate key
+    # Surrogate key: Use abs(hash) to avoid negative, keep within safe integer range
+    (F.abs(F.hash(F.col("category_id").cast("string"))) % 2147480000).alias("category_key"),
     F.col("category_id").alias("category_id"),  # Natural key
     F.col("category_name"),
     F.col("description"),
@@ -275,8 +277,10 @@ print("Creating dim_order...")
 df_orders = spark.table(f"{CATALOG_NAME}.{SILVER_SCHEMA}.orders")
 
 # Create degenerate dimension with order attributes
+# Generate surrogate key using hash (deterministic)
 df_dim_order = df_orders.select(
-    F.col("order_id").alias("order_key"),  # Surrogate key
+    # Surrogate key: Use abs(hash) to avoid negative, keep within safe integer range
+    (F.abs(F.hash(F.col("order_id").cast("string"))) % 2147480000).alias("order_key"),
     F.col("order_id").alias("order_id"),   # Natural key
     F.col("status"),
     F.col("payment_type"),

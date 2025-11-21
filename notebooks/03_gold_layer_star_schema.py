@@ -6,38 +6,16 @@
 # MAGIC
 # MAGIC ## Star Schema Design
 # MAGIC
-# MAGIC ```
-# MAGIC                    ┌─────────────────┐
-# MAGIC                    │   fato_vendas   │
-# MAGIC                    │   (Fact Table)  │
-# MAGIC                    └────────┬────────┘
-# MAGIC                             │
-# MAGIC        ┌────────────────────┼────────────────────┐
-# MAGIC        │                     │                    │
-# MAGIC        ▼                     ▼                    ▼
-# MAGIC ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-# MAGIC │ dim_customer │    │ dim_product  │    │  dim_time    │
-# MAGIC │ (Dimension)  │    │ (Dimension)  │    │ (Dimension)  │
-# MAGIC └──────────────┘    └──────────────┘    └──────────────┘
-# MAGIC        │                     │                    │
-# MAGIC        │                     │                    │
-# MAGIC        ▼                     ▼                    ▼
-# MAGIC ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-# MAGIC │ dim_category │    │  dim_order   │    │              │
-# MAGIC │ (Dimension)  │    │ (Degenerate) │    │              │
-# MAGIC └──────────────┘    └──────────────┘    └──────────────┘
-# MAGIC ```
-# MAGIC
 # MAGIC ### Fact Table: `fato_vendas`
 # MAGIC - Granularity: Order Item level
 # MAGIC - Measures: quantity, unit_price, subtotal
-# MAGIC - Foreign Keys: customer_key, product_key, time_key, order_key
+# MAGIC - Foreign Keys: customer_key, product_key, category_key, date_key, order_key
 # MAGIC
 # MAGIC ### Dimension Tables:
-# MAGIC - **dim_customer**: Customer attributes (SCD Type 1)
-# MAGIC - **dim_product**: Product attributes (SCD Type 1)
-# MAGIC - **dim_category**: Category attributes (SCD Type 1)
-# MAGIC - **dim_time**: Date dimension with hierarchies
+# MAGIC - **dim_customer**: Customer attributes (SCD Type 2 - maintains history)
+# MAGIC - **dim_product**: Product attributes (SCD Type 2 - maintains history)
+# MAGIC - **dim_category**: Category attributes (SCD Type 1 - overwrites)
+# MAGIC - **dim_time**: Date dimension with hierarchies (static)
 # MAGIC - **dim_order**: Order attributes as degenerate dimension
 
 # COMMAND ----------
@@ -95,7 +73,7 @@ print("Creating dim_category...")
 # Read from silver
 df_categories = spark.table(f"{CATALOG_NAME}.{SILVER_SCHEMA}.categories")
 
-# Create dimension table with surrogate key
+# Create dimension table with surrogate key (SCD Type 1)
 df_dim_category = df_categories.select(
     F.col("category_id").alias("category_key"),  # Surrogate key
     F.col("category_id").alias("category_id"),  # Natural key
@@ -124,9 +102,15 @@ print("Creating dim_customer...")
 # Read from silver
 df_customers = spark.table(f"{CATALOG_NAME}.{SILVER_SCHEMA}.customers")
 
-# Create dimension table with surrogate key and additional attributes
-df_dim_customer = df_customers.select(
-    F.col("customer_id").alias("customer_key"),  # Surrogate key
+# Create dimension table with SCD Type 2 (maintains history)
+# For initial load, all records are current
+# Generate surrogate key using row_number (deterministic)
+window_spec = Window.partitionBy("customer_id").orderBy("registration_date")
+df_dim_customer = df_customers.withColumn(
+    "row_num", F.row_number().over(window_spec)
+).select(
+    # Surrogate key: hash of natural key + row number for uniqueness
+    (F.hash(F.col("customer_id").cast("string")) * 1000 + F.col("row_num")).alias("customer_key"),
     F.col("customer_id").alias("customer_id"),   # Natural key
     F.col("first_name"),
     F.col("last_name"),
@@ -140,6 +124,10 @@ df_dim_customer = df_customers.select(
     F.col("zip_code"),
     F.col("registration_date"),
     F.datediff(F.current_date(), F.col("registration_date")).alias("days_since_registration"),
+    # SCD Type 2 fields
+    F.coalesce(F.col("registration_date"), F.current_date()).alias("valid_from"),
+    F.lit(None).cast("date").alias("valid_to"),  # NULL means current
+    F.lit(1).alias("is_current"),  # 1 = current record
     F.current_timestamp().alias("created_at"),
     F.current_timestamp().alias("updated_at")
 )
@@ -166,12 +154,18 @@ df_products = spark.table(f"{CATALOG_NAME}.{SILVER_SCHEMA}.products")
 # Join with categories to get category name
 df_categories_silver = spark.table(f"{CATALOG_NAME}.{SILVER_SCHEMA}.categories")
 
+# Generate surrogate key using row_number (deterministic)
+window_spec_product = Window.partitionBy("product_id").orderBy("created_date")
+
 df_dim_product = df_products.join(
     df_categories_silver.select("category_id", "category_name"),
     on="category_id",
     how="left"
+).withColumn(
+    "row_num", F.row_number().over(window_spec_product)
 ).select(
-    F.col("product_id").alias("product_key"),  # Surrogate key
+    # Surrogate key: hash of natural key + row number for uniqueness
+    (F.hash(F.col("product_id").cast("string")) * 1000 + F.col("row_num")).alias("product_key"),
     F.col("product_id").alias("product_id"),   # Natural key
     F.col("product_name"),
     F.col("category_id"),
@@ -181,6 +175,10 @@ df_dim_product = df_products.join(
     F.when(F.col("stock_quantity") > 0, "In Stock")
      .otherwise("Out of Stock").alias("stock_status"),
     F.col("created_date"),
+    # SCD Type 2 fields
+    F.coalesce(F.col("created_date"), F.current_date()).alias("valid_from"),
+    F.lit(None).cast("date").alias("valid_to"),  # NULL means current
+    F.lit(1).alias("is_current"),  # 1 = current record
     F.current_timestamp().alias("created_at"),
     F.current_timestamp().alias("updated_at")
 )
@@ -309,19 +307,26 @@ df_fact_base = df_order_items.join(
 )
 
 # Get dimension keys
-df_dim_customer = spark.table(f"{CATALOG_NAME}.{GOLD_SCHEMA}.dim_customer")
-df_dim_product = spark.table(f"{CATALOG_NAME}.{GOLD_SCHEMA}.dim_product")
+# For SCD Type 2, we need to join only current records (is_current = 1)
+df_dim_customer = spark.table(f"{CATALOG_NAME}.{GOLD_SCHEMA}.dim_customer").filter(F.col("is_current") == 1)
+df_dim_product = spark.table(f"{CATALOG_NAME}.{GOLD_SCHEMA}.dim_product").filter(F.col("is_current") == 1)
+df_dim_category = spark.table(f"{CATALOG_NAME}.{GOLD_SCHEMA}.dim_category")
 df_dim_time = spark.table(f"{CATALOG_NAME}.{GOLD_SCHEMA}.dim_time")
 df_dim_order = spark.table(f"{CATALOG_NAME}.{GOLD_SCHEMA}.dim_order")
 
 # Create fact table with foreign keys and measures
+# In Star Schema, ALL dimensions connect directly to the fact table
 df_fato_vendas = df_fact_base.join(
     df_dim_customer.select("customer_id", "customer_key"),
     on="customer_id",
     how="inner"
 ).join(
-    df_dim_product.select("product_id", "product_key"),
+    df_dim_product.select("product_id", "product_key", "category_id"),
     on="product_id",
+    how="inner"
+).join(
+    df_dim_category.select("category_id", "category_key"),
+    on="category_id",
     how="inner"
 ).join(
     df_dim_time.select("full_date", "date_key"),
@@ -332,9 +337,10 @@ df_fato_vendas = df_fact_base.join(
     on="order_id",
     how="inner"
 ).select(
-    # Foreign Keys
+    # Foreign Keys (all dimensions connect to fact table)
     F.col("customer_key"),
     F.col("product_key"),
+    F.col("category_key"),  # Direct connection to fact table
     F.col("date_key"),
     F.col("order_key"),
     # Natural Keys (for reference)

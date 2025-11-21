@@ -83,6 +83,10 @@ def add_nulls(df, percentage=0.05):
 
 def mess_up_dates(date_str):
     """Create inconsistent date formats"""
+    # Handle null/NaT values
+    if pd.isna(date_str) or date_str is None:
+        return date_str
+    
     if isinstance(date_str, str):
         try:
             date_obj = datetime.strptime(date_str, "%Y-%m-%d")
@@ -90,6 +94,10 @@ def mess_up_dates(date_str):
             return date_str
     else:
         date_obj = date_str
+    
+    # Check if date_obj is NaT (pandas NaTType)
+    if pd.isna(date_obj):
+        return date_obj
     
     formats = [
         lambda d: d.strftime("%Y-%m-%d"),      # ISO format

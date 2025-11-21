@@ -109,6 +109,26 @@ def convert_to_numeric(value, default=None):
     except:
         return default
 
+def parse_date_column(column_name):
+    """Parse date column trying multiple formats using coalesce"""
+    # List of common date formats to try
+    date_formats = [
+        "yyyy-MM-dd",      # ISO format: 2024-01-15
+        "yyyy/MM/dd",      # Slash format: 2024/01/15
+        "dd/MM/yyyy",      # DD/MM/YYYY: 15/01/2024
+        "MM-dd-yyyy",      # MM-DD-YYYY: 01-15-2024
+        "dd-MM-yyyy",      # DD-MM-YYYY: 15-01-2024
+        "MMM dd, yyyy",    # Jan 15, 2024
+        "MMMM dd, yyyy",   # January 15, 2024
+    ]
+    
+    # Build coalesce expression trying each format
+    # Use try_to_date to avoid errors, returns NULL if format doesn't match
+    date_exprs = [F.try_to_date(F.col(column_name), fmt) for fmt in date_formats]
+    
+    # Coalesce returns first non-null value
+    return F.coalesce(*date_exprs)
+
 def save_silver_table(df, table_name, mode="overwrite"):
     """Save cleaned DataFrame to Silver layer"""
     full_table_path = f"{CATALOG_NAME}.{SILVER_SCHEMA}.{table_name}"
@@ -195,13 +215,13 @@ df_customers_silver = df_customers_silver.withColumn(
     F.trim(F.col("phone"))
 )
 
-# Standardize dates
+# Standardize dates (try multiple formats)
 df_customers_silver = df_customers_silver.withColumn(
     "birth_date",
-    F.to_date(F.col("birth_date"), "yyyy-MM-dd")
+    parse_date_column("birth_date")
 ).withColumn(
     "registration_date",
-    F.to_date(F.col("registration_date"), "yyyy-MM-dd")
+    parse_date_column("registration_date")
 )
 
 # Convert zip_code to integer (handle type errors)
@@ -269,10 +289,10 @@ df_products_silver = df_products_silver.withColumn(
     ).otherwise(F.lit(0))  # Default to 0 if invalid
 )
 
-# Standardize created_date
+# Standardize created_date (try multiple formats)
 df_products_silver = df_products_silver.withColumn(
     "created_date",
-    F.to_date(F.col("created_date"), "yyyy-MM-dd")
+    parse_date_column("created_date")
 )
 
 # Validate category_id exists in categories table
@@ -324,10 +344,10 @@ df_orders_silver = df_orders_silver.withColumn(
     F.trim(F.initcap(F.col("payment_type")))
 )
 
-# Standardize order_date
+# Standardize order_date (try multiple formats)
 df_orders_silver = df_orders_silver.withColumn(
     "order_date",
-    F.to_date(F.col("order_date"), "yyyy-MM-dd")
+    parse_date_column("order_date")
 )
 
 # Convert total_amount to double (handle type errors)
@@ -474,16 +494,3 @@ print("  • String formats normalized (trimmed, title case)")
 print("  • Type errors corrected (strings → numeric)")
 print("  • Referential integrity validated")
 print("\n" + "="*60)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Next Steps
-# MAGIC
-# MAGIC 1. **Verify cleaned data**: Query the silver tables
-# MAGIC    ```sql
-# MAGIC    SELECT * FROM ecommerce_data.silver.customers LIMIT 10;
-# MAGIC    ```
-# MAGIC 2. **Gold Layer**: Create dimension and fact tables for star schema
-# MAGIC 3. **Data Quality Checks**: Run additional validation queries
-

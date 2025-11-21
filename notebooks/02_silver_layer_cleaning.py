@@ -184,7 +184,7 @@ print(f"✅ Categories cleaned: {df_categories_silver.count()} rows")
 
 print("Cleaning customers...")
 
-# Read from bronze - read date columns as strings to avoid parsing errors
+# Read from bronze
 df_customers_bronze = spark.table(f"{CATALOG_NAME}.{BRONZE_SCHEMA}.customers")
 
 print(f"📊 Bronze records: {df_customers_bronze.count()}")
@@ -223,7 +223,7 @@ df_customers_silver = df_customers_silver.withColumn(
     parse_date_column_sql("registration_date")
 )
 
-# Convert zip_code to integer (handle type errors)
+# Convert zip_code to integer
 df_customers_silver = df_customers_silver.withColumn(
     "zip_code",
     F.when(
@@ -270,7 +270,7 @@ df_products_silver = df_products_silver.withColumn(
     F.trim(F.initcap(F.col("product_name")))
 )
 
-# Convert price to double (handle type errors)
+# Convert price to double
 df_products_silver = df_products_silver.withColumn(
     "price",
     F.when(
@@ -279,7 +279,7 @@ df_products_silver = df_products_silver.withColumn(
     ).otherwise(None)
 )
 
-# Convert stock_quantity to integer (handle type errors)
+# Convert stock_quantity to integer
 df_products_silver = df_products_silver.withColumn(
     "stock_quantity",
     F.when(
@@ -349,7 +349,7 @@ df_orders_silver = df_orders_silver.withColumn(
     parse_date_column_sql("order_date")
 )
 
-# Convert total_amount to double (handle type errors)
+# Convert total_amount to double
 df_orders_silver = df_orders_silver.withColumn(
     "total_amount",
     F.when(
@@ -398,7 +398,7 @@ print(f"📊 Bronze records: {df_order_items_bronze.count()}")
 # Remove duplicates
 df_order_items_silver = df_order_items_bronze.dropDuplicates(["item_id"])
 
-# Convert quantity to integer (handle type errors)
+# Convert quantity to integer
 df_order_items_silver = df_order_items_silver.withColumn(
     "quantity",
     F.when(
@@ -407,7 +407,7 @@ df_order_items_silver = df_order_items_silver.withColumn(
     ).otherwise(F.lit(1))  # Default to 1 if invalid
 )
 
-# Convert unit_price to double (handle type errors)
+# Convert unit_price to double
 df_order_items_silver = df_order_items_silver.withColumn(
     "unit_price",
     F.when(

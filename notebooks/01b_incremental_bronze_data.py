@@ -165,7 +165,7 @@ def save_to_unity_catalog(df, table_name, schema_name=BRONZE_SCHEMA, catalog_nam
     """
     # Convert pandas DataFrame to Spark DataFrame if needed
     if isinstance(df, pd.DataFrame):
-        # Handle columns with mixed types (object) by casting to string
+        # Convert object columns to string for consistent schema
         for col in df.columns:
             if df[col].dtype == 'object':
                 if df[col].apply(lambda x: not isinstance(x, (int, float)) and x is not None and not pd.isna(x)).any():
@@ -318,7 +318,7 @@ df_new_customers['last_name'] = df_new_customers['last_name'].apply(mess_up_stri
 df_new_customers['city'] = df_new_customers['city'].apply(mess_up_strings)
 df_new_customers['state'] = df_new_customers['state'].apply(mess_up_strings)
 
-# Convert some zip codes to strings (type error)
+# Convert some zip codes to strings (simulate type inconsistency)
 df_new_customers['zip_code'] = df_new_customers['zip_code'].apply(convert_to_string)
 
 # Append to Unity Catalog
@@ -380,7 +380,7 @@ df_new_products['created_date'] = df_new_products['created_date'].apply(mess_up_
 # Mess up strings
 df_new_products['product_name'] = df_new_products['product_name'].apply(mess_up_strings)
 
-# Convert some prices and stock to strings (type error)
+# Convert some prices and stock to strings (simulate type inconsistency)
 df_new_products['price'] = df_new_products['price'].apply(convert_to_string)
 df_new_products['stock_quantity'] = df_new_products['stock_quantity'].apply(convert_to_string)
 
@@ -438,7 +438,7 @@ df_new_orders['order_date'] = df_new_orders['order_date'].apply(mess_up_dates)
 df_new_orders['status'] = df_new_orders['status'].apply(mess_up_strings)
 df_new_orders['payment_type'] = df_new_orders['payment_type'].apply(mess_up_strings)
 
-# Convert some amounts to strings (type error)
+# Convert some amounts to strings (simulate type inconsistency)
 df_new_orders['total_amount'] = df_new_orders['total_amount'].apply(convert_to_string)
 
 # Append to Unity Catalog
@@ -487,7 +487,7 @@ df_new_order_items = pd.DataFrame(order_items_data)
 df_new_order_items = add_nulls(df_new_order_items, 0.05)
 df_new_order_items = add_duplicates(df_new_order_items, 0.01)
 
-# Convert some numeric fields to strings (type error)
+# Convert some numeric fields to strings (simulate type inconsistency)
 df_new_order_items['quantity'] = df_new_order_items['quantity'].apply(convert_to_string)
 df_new_order_items['unit_price'] = df_new_order_items['unit_price'].apply(convert_to_string)
 df_new_order_items['subtotal'] = df_new_order_items['subtotal'].apply(convert_to_string)

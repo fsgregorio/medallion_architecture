@@ -156,8 +156,7 @@ def save_to_unity_catalog(df, table_name, schema_name=BRONZE_SCHEMA, catalog_nam
         # Create a copy to avoid modifying the original
         df_copy = df.copy()
         
-        # Convert object columns (mixed types) to string to avoid Arrow conversion errors
-        # This handles cases where numeric columns have some values as strings (type errors)
+        # Convert object columns to string for consistent schema
         # This is intentional for bronze layer to simulate data quality issues
         for col in df_copy.columns:
             if df_copy[col].dtype == 'object':
@@ -290,7 +289,7 @@ df_customers['last_name'] = df_customers['last_name'].apply(mess_up_strings)
 df_customers['city'] = df_customers['city'].apply(mess_up_strings)
 df_customers['state'] = df_customers['state'].apply(mess_up_strings)
 
-# Convert some zip codes to strings (type error)
+# Convert some zip codes to strings (simulate type inconsistency)
 df_customers['zip_code'] = df_customers['zip_code'].apply(convert_to_string)
 
 # Save to Unity Catalog
@@ -353,7 +352,7 @@ df_products['created_date'] = df_products['created_date'].apply(mess_up_dates)
 # Mess up strings
 df_products['product_name'] = df_products['product_name'].apply(mess_up_strings)
 
-# Convert some prices and stock to strings (type error)
+# Convert some prices and stock to strings (simulate type inconsistency)
 df_products['price'] = df_products['price'].apply(convert_to_string)
 df_products['stock_quantity'] = df_products['stock_quantity'].apply(convert_to_string)
 
@@ -410,7 +409,7 @@ df_orders['order_date'] = df_orders['order_date'].apply(mess_up_dates)
 df_orders['status'] = df_orders['status'].apply(mess_up_strings)
 df_orders['payment_type'] = df_orders['payment_type'].apply(mess_up_strings)
 
-# Convert some amounts to strings (type error)
+# Convert some amounts to strings (simulate type inconsistency)
 df_orders['total_amount'] = df_orders['total_amount'].apply(convert_to_string)
 
 # Save to Unity Catalog
@@ -459,7 +458,7 @@ df_order_items = pd.DataFrame(order_items_data)
 df_order_items = add_nulls(df_order_items, 0.05)
 df_order_items = add_duplicates(df_order_items, 0.01)
 
-# Convert some numeric fields to strings (type error)
+# Convert some numeric fields to strings (simulate type inconsistency)
 df_order_items['quantity'] = df_order_items['quantity'].apply(convert_to_string)
 df_order_items['unit_price'] = df_order_items['unit_price'].apply(convert_to_string)
 df_order_items['subtotal'] = df_order_items['subtotal'].apply(convert_to_string)

@@ -153,7 +153,20 @@ def save_to_unity_catalog(df, table_name, schema_name=BRONZE_SCHEMA, catalog_nam
     # Convert pandas DataFrame to Spark DataFrame if needed
     # Note: 'spark' is a global variable available in Databricks notebooks
     if isinstance(df, pd.DataFrame):
-        spark_df = spark.createDataFrame(df)
+        # Create a copy to avoid modifying the original
+        df_copy = df.copy()
+        
+        # Convert object columns (mixed types) to string to avoid Arrow conversion errors
+        # This handles cases where numeric columns have some values as strings (type errors)
+        # This is intentional for bronze layer to simulate data quality issues
+        for col in df_copy.columns:
+            if df_copy[col].dtype == 'object':
+                # Convert to string, preserving None/NaN values
+                df_copy[col] = df_copy[col].apply(
+                    lambda x: str(x) if pd.notna(x) else None
+                )
+        
+        spark_df = spark.createDataFrame(df_copy)
     else:
         spark_df = df
     

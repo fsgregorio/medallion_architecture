@@ -1,18 +1,18 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Generate Bronze Layer Datasets
-# MAGIC 
+# MAGIC
 # MAGIC This notebook generates synthetic e-commerce data with data quality issues for practicing Medallion Architecture.
-# MAGIC 
+# MAGIC
 # MAGIC ## Overview
-# MAGIC 
+# MAGIC
 # MAGIC Generates 5 related tables:
 # MAGIC - **categories**: Product categories (dimension)
 # MAGIC - **customers**: Customer information (dimension)
 # MAGIC - **products**: Product catalog (dimension)
 # MAGIC - **orders**: Order transactions (fact)
 # MAGIC - **order_items**: Order line items (fact)
-# MAGIC 
+# MAGIC
 # MAGIC Each table is saved to Unity Catalog in the bronze schema.
 
 # COMMAND ----------
@@ -494,16 +494,3 @@ print("  • Inconsistent date formats")
 print("  • Inconsistent string formatting (case, spaces)")
 print("  • Type errors (numbers as strings)")
 print("\n" + "="*60)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Next Steps
-# MAGIC 
-# MAGIC 1. **Verify data**: Query the tables in Unity Catalog
-# MAGIC    ```sql
-# MAGIC    SELECT * FROM ecommerce_data.bronze.categories LIMIT 10;
-# MAGIC    ```
-# MAGIC 2. **Silver Layer**: Create notebooks to clean and validate the data from bronze tables
-# MAGIC 3. **Gold Layer**: Create dimension and fact tables for star schema
-

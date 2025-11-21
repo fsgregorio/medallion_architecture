@@ -114,16 +114,16 @@ def convert_to_numeric(value, default=None):
 def parse_date_column_sql(column_name):
     """Parse date column using SQL try_to_date (works in all Spark versions)"""
     # Use SQL expression - try_to_date is available in Spark SQL
-    col_name = column_name
+    # Reference column name with backticks to handle special characters
     return F.expr(f"""
         COALESCE(
-            try_to_date(CAST({col_name} AS STRING), 'yyyy-MM-dd'),
-            try_to_date(CAST({col_name} AS STRING), 'yyyy/MM/dd'),
-            try_to_date(CAST({col_name} AS STRING), 'dd/MM/yyyy'),
-            try_to_date(CAST({col_name} AS STRING), 'MM-dd-yyyy'),
-            try_to_date(CAST({col_name} AS STRING), 'dd-MM-yyyy'),
-            try_to_date(CAST({col_name} AS STRING), 'MMM dd, yyyy'),
-            try_to_date(CAST({col_name} AS STRING), 'MMMM dd, yyyy')
+            try_to_date(CAST(`{column_name}` AS STRING), 'yyyy-MM-dd'),
+            try_to_date(CAST(`{column_name}` AS STRING), 'yyyy/MM/dd'),
+            try_to_date(CAST(`{column_name}` AS STRING), 'dd/MM/yyyy'),
+            try_to_date(CAST(`{column_name}` AS STRING), 'MM-dd-yyyy'),
+            try_to_date(CAST(`{column_name}` AS STRING), 'dd-MM-yyyy'),
+            try_to_date(CAST(`{column_name}` AS STRING), 'MMM dd, yyyy'),
+            try_to_date(CAST(`{column_name}` AS STRING), 'MMMM dd, yyyy')
         )
     """)
 

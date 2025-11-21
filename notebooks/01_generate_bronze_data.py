@@ -13,7 +13,7 @@
 # MAGIC - **orders**: Order transactions (fact)
 # MAGIC - **order_items**: Order line items (fact)
 # MAGIC 
-# MAGIC Each table is generated in CSV, JSON, and Parquet formats.
+# MAGIC Each table is saved to Unity Catalog in the bronze schema.
 
 # COMMAND ----------
 
@@ -26,7 +26,6 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import random
-from pathlib import Path
 
 # Set random seed for reproducibility
 np.random.seed(42)
@@ -35,35 +34,23 @@ random.seed(42)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Configure Output Path
-# MAGIC 
-# MAGIC Choose one of the following options:
-# MAGIC - **DBFS** (local to workspace): `/dbfs/mnt/bronze/`
-# MAGIC - **Cloud Storage**:
-# MAGIC   - AWS S3: `s3://your-bucket/bronze/`
-# MAGIC   - Azure ADLS: `abfss://container@account.dfs.core.windows.net/bronze/`
-# MAGIC   - GCP GCS: `gs://your-bucket/bronze/`
+# MAGIC ## Unity Catalog Configuration
 
 # COMMAND ----------
 
-# Configure output path
-# Option 1: DBFS (local to workspace)
-OUTPUT_BASE_PATH = "/dbfs/mnt/bronze/"
+# Configure Unity Catalog settings
+CATALOG_NAME = "ecommerce_data"
+BRONZE_SCHEMA = "bronze"
+SILVER_SCHEMA = "silver"
+GOLD_SCHEMA = "gold"
 
-# Option 2: Cloud storage (uncomment and configure)
-# OUTPUT_BASE_PATH = "s3://your-bucket/bronze/"  # AWS
-# OUTPUT_BASE_PATH = "gs://your-bucket/bronze/"   # GCP
-# OUTPUT_BASE_PATH = "abfss://container@account.dfs.core.windows.net/bronze/"  # Azure
+# Set catalog and schema
+# Note: 'spark' is a global variable available in Databricks notebooks
+spark.sql(f"USE CATALOG {CATALOG_NAME}")
+spark.sql(f"USE SCHEMA {BRONZE_SCHEMA}")
 
-# Create directories
-formats = ["csv", "json", "parquet"]
-tables = ["categories", "customers", "products", "orders", "order_items"]
-
-for table in tables:
-    for fmt in formats:
-        Path(f"{OUTPUT_BASE_PATH}{table}/{fmt}").mkdir(parents=True, exist_ok=True)
-
-print(f"✅ Output path configured: {OUTPUT_BASE_PATH}")
+print(f"✅ Using catalog: {CATALOG_NAME}")
+print(f"✅ Using schema: {BRONZE_SCHEMA}")
 
 # COMMAND ----------
 
@@ -140,6 +127,43 @@ def convert_to_string(value):
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## Helper Function to Save as Unity Catalog Table
+
+# COMMAND ----------
+
+def save_to_unity_catalog(df, table_name, schema_name=BRONZE_SCHEMA, catalog_name=CATALOG_NAME, mode="overwrite"):
+    """
+    Save DataFrame as Unity Catalog table
+    
+    Parameters:
+    - df: Spark DataFrame or Pandas DataFrame
+    - table_name: Name of the table
+    - schema_name: Schema name (default: bronze)
+    - catalog_name: Catalog name (default: ecommerce_data)
+    - mode: Write mode (overwrite, append, ignore, error)
+    """
+    # Convert pandas DataFrame to Spark DataFrame if needed
+    # Note: 'spark' is a global variable available in Databricks notebooks
+    if isinstance(df, pd.DataFrame):
+        spark_df = spark.createDataFrame(df)
+    else:
+        spark_df = df
+    
+    # Full table path
+    full_table_path = f"{catalog_name}.{schema_name}.{table_name}"
+    
+    # Write to Unity Catalog
+    spark_df.write \
+        .mode(mode) \
+        .option("overwriteSchema", "true") \
+        .saveAsTable(full_table_path)
+    
+    print(f"✅ Table created: {full_table_path}")
+    return full_table_path
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## 1. Generate Categories
 
 # COMMAND ----------
@@ -171,15 +195,8 @@ df_categories = add_duplicates(df_categories, 0.01)
 df_categories['category_name'] = df_categories['category_name'].apply(mess_up_strings)
 df_categories['description'] = df_categories['description'].apply(mess_up_strings)
 
-# Save in all formats
-for fmt in formats:
-    path = f"{OUTPUT_BASE_PATH}categories/{fmt}/categories.{fmt}"
-    if fmt == "csv":
-        df_categories.to_csv(path, index=False)
-    elif fmt == "json":
-        df_categories.to_json(path, orient="records", date_format="iso")
-    elif fmt == "parquet":
-        df_categories.to_parquet(path, index=False)
+# Save to Unity Catalog
+save_to_unity_catalog(df_categories, "categories")
 
 print(f"✅ Categories generated: {len(df_categories)} rows")
 
@@ -255,15 +272,8 @@ df_customers['state'] = df_customers['state'].apply(mess_up_strings)
 # Convert some zip codes to strings (type error)
 df_customers['zip_code'] = df_customers['zip_code'].apply(convert_to_string)
 
-# Save in all formats
-for fmt in formats:
-    path = f"{OUTPUT_BASE_PATH}customers/{fmt}/customers.{fmt}"
-    if fmt == "csv":
-        df_customers.to_csv(path, index=False)
-    elif fmt == "json":
-        df_customers.to_json(path, orient="records", date_format="iso")
-    elif fmt == "parquet":
-        df_customers.to_parquet(path, index=False)
+# Save to Unity Catalog
+save_to_unity_catalog(df_customers, "customers")
 
 print(f"✅ Customers generated: {len(df_customers)} rows")
 
@@ -326,15 +336,8 @@ df_products['product_name'] = df_products['product_name'].apply(mess_up_strings)
 df_products['price'] = df_products['price'].apply(convert_to_string)
 df_products['stock_quantity'] = df_products['stock_quantity'].apply(convert_to_string)
 
-# Save in all formats
-for fmt in formats:
-    path = f"{OUTPUT_BASE_PATH}products/{fmt}/products.{fmt}"
-    if fmt == "csv":
-        df_products.to_csv(path, index=False)
-    elif fmt == "json":
-        df_products.to_json(path, orient="records", date_format="iso")
-    elif fmt == "parquet":
-        df_products.to_parquet(path, index=False)
+# Save to Unity Catalog
+save_to_unity_catalog(df_products, "products")
 
 print(f"✅ Products generated: {len(df_products)} rows")
 
@@ -389,15 +392,8 @@ df_orders['payment_type'] = df_orders['payment_type'].apply(mess_up_strings)
 # Convert some amounts to strings (type error)
 df_orders['total_amount'] = df_orders['total_amount'].apply(convert_to_string)
 
-# Save in all formats
-for fmt in formats:
-    path = f"{OUTPUT_BASE_PATH}orders/{fmt}/orders.{fmt}"
-    if fmt == "csv":
-        df_orders.to_csv(path, index=False)
-    elif fmt == "json":
-        df_orders.to_json(path, orient="records", date_format="iso")
-    elif fmt == "parquet":
-        df_orders.to_parquet(path, index=False)
+# Save to Unity Catalog
+save_to_unity_catalog(df_orders, "orders")
 
 print(f"✅ Orders generated: {len(df_orders)} rows")
 
@@ -447,15 +443,8 @@ df_order_items['quantity'] = df_order_items['quantity'].apply(convert_to_string)
 df_order_items['unit_price'] = df_order_items['unit_price'].apply(convert_to_string)
 df_order_items['subtotal'] = df_order_items['subtotal'].apply(convert_to_string)
 
-# Save in all formats
-for fmt in formats:
-    path = f"{OUTPUT_BASE_PATH}order_items/{fmt}/order_items.{fmt}"
-    if fmt == "csv":
-        df_order_items.to_csv(path, index=False)
-    elif fmt == "json":
-        df_order_items.to_json(path, orient="records", date_format="iso")
-    elif fmt == "parquet":
-        df_order_items.to_parquet(path, index=False)
+# Save to Unity Catalog
+save_to_unity_catalog(df_order_items, "order_items")
 
 print(f"✅ Order items generated: {len(df_order_items)} rows")
 
@@ -469,14 +458,14 @@ print(f"✅ Order items generated: {len(df_order_items)} rows")
 print("\n" + "="*60)
 print("✅ ALL DATASETS GENERATED SUCCESSFULLY!")
 print("="*60)
-print(f"\n📁 Output path: {OUTPUT_BASE_PATH}")
+print(f"\n📁 Catalog: {CATALOG_NAME}.{BRONZE_SCHEMA}")
 print("\n📊 Tables generated:")
-print(f"  • Categories:     {len(df_categories):,} rows")
-print(f"  • Customers:      {len(df_customers):,} rows")
-print(f"  • Products:       {len(df_products):,} rows")
-print(f"  • Orders:         {len(df_orders):,} rows")
-print(f"  • Order Items:    {len(df_order_items):,} rows")
-print(f"\n📦 Formats: CSV, JSON, Parquet")
+print(f"  • Categories:     {len(df_categories):,} rows → {CATALOG_NAME}.{BRONZE_SCHEMA}.categories")
+print(f"  • Customers:      {len(df_customers):,} rows → {CATALOG_NAME}.{BRONZE_SCHEMA}.customers")
+print(f"  • Products:       {len(df_products):,} rows → {CATALOG_NAME}.{BRONZE_SCHEMA}.products")
+print(f"  • Orders:         {len(df_orders):,} rows → {CATALOG_NAME}.{BRONZE_SCHEMA}.orders")
+print(f"  • Order Items:    {len(df_order_items):,} rows → {CATALOG_NAME}.{BRONZE_SCHEMA}.order_items")
+print(f"\n📦 Tables saved to Unity Catalog")
 print("\n🐛 Data quality issues included:")
 print("  • ~1% duplicate records")
 print("  • ~5% null values")
@@ -490,7 +479,10 @@ print("\n" + "="*60)
 # MAGIC %md
 # MAGIC ## Next Steps
 # MAGIC 
-# MAGIC 1. **Verify data**: Check the generated files in your storage location
-# MAGIC 2. **Silver Layer**: Create notebooks to clean and validate the data
+# MAGIC 1. **Verify data**: Query the tables in Unity Catalog
+# MAGIC    ```sql
+# MAGIC    SELECT * FROM ecommerce_data.bronze.categories LIMIT 10;
+# MAGIC    ```
+# MAGIC 2. **Silver Layer**: Create notebooks to clean and validate the data from bronze tables
 # MAGIC 3. **Gold Layer**: Create dimension and fact tables for star schema
 

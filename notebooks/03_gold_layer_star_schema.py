@@ -77,7 +77,7 @@ df_categories = spark.table(f"{CATALOG_NAME}.{SILVER_SCHEMA}.categories")
 # Create dimension table with surrogate key (SCD Type 1)
 # Generate surrogate key using hash (deterministic)
 df_dim_category = df_categories.select(
-    # Surrogate key: Use abs(hash) to avoid negative, keep within safe integer range
+    # Surrogate key: Generate unique key using hash
     (F.abs(F.hash(F.col("category_id").cast("string"))) % 2147480000).alias("category_key"),
     F.col("category_id").alias("category_id"),  # Natural key
     F.col("category_name"),
@@ -112,9 +112,8 @@ window_spec = Window.partitionBy("customer_id").orderBy("registration_date")
 df_dim_customer = df_customers.withColumn(
     "row_num", F.row_number().over(window_spec)
 ).select(
-    # Surrogate key: Use abs(hash) to avoid negative, then add row_num
-    # Using modulo to keep within safe integer range (max int32 is 2147483647)
-    # We use a smaller modulo to leave room for row_num addition
+    # Surrogate key: Generate unique key using hash and row number
+    # Using modulo to keep within integer range
     (F.abs(F.hash(F.col("customer_id").cast("string"))) % 2147480000 + F.col("row_num")).alias("customer_key"),
     F.col("customer_id").alias("customer_id"),   # Natural key
     F.col("first_name"),
@@ -169,9 +168,8 @@ df_dim_product = df_products.join(
 ).withColumn(
     "row_num", F.row_number().over(window_spec_product)
 ).select(
-    # Surrogate key: Use abs(hash) to avoid negative, then add row_num
-    # Using modulo to keep within safe integer range (max int32 is 2147483647)
-    # We use a smaller modulo to leave room for row_num addition
+    # Surrogate key: Generate unique key using hash and row number
+    # Using modulo to keep within integer range
     (F.abs(F.hash(F.col("product_id").cast("string"))) % 2147480000 + F.col("row_num")).alias("product_key"),
     F.col("product_id").alias("product_id"),   # Natural key
     F.col("product_name"),
@@ -279,7 +277,7 @@ df_orders = spark.table(f"{CATALOG_NAME}.{SILVER_SCHEMA}.orders")
 # Create degenerate dimension with order attributes
 # Generate surrogate key using hash (deterministic)
 df_dim_order = df_orders.select(
-    # Surrogate key: Use abs(hash) to avoid negative, keep within safe integer range
+    # Surrogate key: Generate unique key using hash
     (F.abs(F.hash(F.col("order_id").cast("string"))) % 2147480000).alias("order_key"),
     F.col("order_id").alias("order_id"),   # Natural key
     F.col("status"),
